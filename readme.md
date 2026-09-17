@@ -1,4 +1,5 @@
-Tangler turns Markdown code blocks into source files.
+## Tangler
+`tangler` turns Markdown code blocks into source files.
 
 Usage: `./tangler --output-dir build document.md`
 
