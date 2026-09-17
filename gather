@@ -1,27 +1,3 @@
-# Gatherer
-
-Gatherer is the reverse operation of tangling. It reads one or more ordinary
-files and emits Markdown blocks in the format understood by `tangler`.
-
-Each input becomes one `file=...` block, so a directory can be gathered into a
-multi-block document and later reconstructed by tangling it. The `--root`
-option controls the paths written into those block headers; directory inputs
-are traversed in sorted order for reproducible documents.
-
-Markdown uses the backtick fence to delimit code. Gatherer chooses a fence one
-character longer than the largest leading backtick run in a file, with three
-as the minimum. A literal Markdown fence inside a source file therefore does
-not end the gathered block.
-
-The implementation lives in the executable `gather`. For example:
-
-	./gather --root src src > gathered.md
-	./tangler --output-dir rebuilt gathered.md
-
-The result in `rebuilt` contains the same relative files as `src`. Use
-`--output FILE` to write the gathered document instead of standard output.
-
-```bash file=gather
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -140,4 +116,3 @@ else
     done
     printf 'gathered %s file(s) into %s\n' "${#paths[@]}" "$output" >&2
 fi
-```
