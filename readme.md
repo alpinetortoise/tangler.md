@@ -24,3 +24,22 @@ gathered.md`. Gatherer lengthens Markdown fences when source content contains
 backticks, so gathered blocks remain safe to tangle. Each block carries a
 `# tangler:block <sha256>` comment; those markers let a later gather recover
 multiple blocks from one tangled output file.
+
+## Weaver
+
+`weaver` inventories a literate Markdown document without tangling it. It
+reports prose as `documentation` and fenced blocks as `code`, classifying them
+as `file`, `chunk`, or `anonymous`.
+
+Run `./weaver tangle.md`, or add `--code-only` to suppress documentation
+ranges. Code records include a stable content ID, target or chunk name, and
+source line range; `--output report.txt` writes the inventory to a file.
+
+## Weaver Source
+
+[weaver.md](weaver.md) is the literate source for `weaver`. Put declarations
+such as `:: <<example>> ::` near its top. `./weaver --weave weaver.md` keeps
+the documentation and declared named blocks while omitting other source
+blocks from the weaved document.
+Add `:: weave-file="path/file.md" ::` near the top to select the woven output
+path relative to the input document. A command-line `--output` overrides it.

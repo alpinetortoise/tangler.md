@@ -262,3 +262,15 @@ several paths or a directory, it emits one block per file, using paths relative
 to `--root`. Its output can be passed directly back to `tangler`. It also uses
 longer Markdown fences when needed and the tangler closes only a matching
 length, allowing source files to contain ordinary triple-backtick lines.
+
+The `weaver` command provides the document inventory view. It reports prose
+ranges as `documentation` and fenced regions as `code`, identifying file
+blocks, named chunks, and anonymous code. Each code record carries a SHA-256
+content ID, so executable material can be located without confusing it with
+explanatory prose. Existing `# tangler:block` markers retain their IDs in the
+report.
+
+The weaver itself is documented in [weaver.md](weaver.md). Its retention
+lexicon uses declarations such as `:: <<named-block>> ::` near the top of the
+document. `./weaver --weave weaver.md` retains prose and only the named blocks
+declared by that lexicon.

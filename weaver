@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    printf '%s\n' \
+        'Usage: weaver [--output FILE] [--code-only] [--weave] DOCUMENT' \
+        '' \
+        'Report documentation and code blocks in a Markdown document.'
+}
+
+die() {
+    printf 'weaver: %s\n' "$1" >&2
+    exit 1
+}
+
+output=-
+output_explicit=false
+code_only=false
+weave=false
+document=
+declare -A retained=()
+
+while (($#)); do
+    case $1 in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -o|--output)
+            (($# >= 2)) || die "missing argument for $1"
+            output=$2
+            output_explicit=true
+            shift 2
+            ;;
+        --code-only)
+            code_only=true
+            shift
+            ;;
+        --weave)
+            weave=true
+            shift
+            ;;
+        --)
+            shift
+            (($# == 1)) || die "expected one Markdown document"
+            document=$1
+            shift
+            ;;
+        -*|*)
+            [[ -z $document ]] || die "unexpected argument: $1"
+            document=$1
+            shift
+            ;;
+    esac
+done
+
+[[ -n $document ]] || { usage >&2; exit 2; }
+[[ -r $document ]] || die "cannot read document: $document"
+if [[ $output != - ]]; then
+    mkdir -p "$(dirname "$output")"
+    exec > "$output"
+fi
+
+temporary=$(mktemp -d)
+trap 'rm -rf "$temporary"' EXIT
+in_block=false
+fence_length=0
+block_start=0
+block_content=$temporary/block
+documentation_start=1
+line_number=0
+
+emit_documentation() {
+    local end=$1
+    ((documentation_start <= end)) || return 0
+    if $weave; then
+        sed -n "${documentation_start},${end}p" "$document"
+    elif ! $code_only; then
+        printf 'documentation lines=%s-%s\n' "$documentation_start" "$end"
+    fi
+}
+
+emit_code() {
+    local end=$1
+    local info=$2
+    local kind=anonymous
+    local target=-
+    local name=-
+    local first_line marker_id
+    local block_id retain=false
+
+    if [[ $info =~ file[[:space:]]*=[[:space:]]*([^[:space:]]+) ]]; then
+        kind=file
+        target=${BASH_REMATCH[1]}
+        target=${target#\"}
+        target=${target%\"}
+    elif [[ $info =~ \<\<([^\>]+)\>\> ]]; then
+        kind=chunk
+        name=${BASH_REMATCH[1]}
+        [[ -n ${retained[$name]+set} ]] && retain=true
+    fi
+    IFS= read -r first_line < "$block_content" || true
+    if [[ $first_line == '# tangler:block '* ]]; then
+        marker_id=${first_line#\# tangler:block }
+    fi
+    if [[ -n ${marker_id:-} && $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]]; then
+        block_id=$marker_id
+    else
+        block_id=$(sha256sum "$block_content" | awk '{print $1}')
+    fi
+    if $weave; then
+        $retain && sed -n "${block_start},${end}p" "$document"
+    else
+        printf 'code id=%s kind=%s target=%s name=%s retain=%s lines=%s-%s\n' \
+            "$block_id" "$kind" "$target" "$name" "$retain" "$block_start" "$end"
+    fi
+    return 0
+}
+
+while IFS= read -r line || [[ -n $line ]]; do
+    ((line_number += 1))
+    if ! $in_block; then
+        if [[ $line == ':: weave-file="'*'" ::' ]]; then
+            weave_file=${line#':: weave-file="'}
+            weave_file=${weave_file%'" ::'}
+            if $weave && ! $output_explicit; then
+                if [[ $weave_file == /* ]]; then
+                    output=$weave_file
+                else
+                    output=$(dirname "$document")/$weave_file
+                fi
+                mkdir -p "$(dirname "$output")"
+                exec > "$output"
+            fi
+            continue
+        fi
+        if [[ $line =~ ^[[:space:]]*::[[:space:]]*\<\<([^\>]+)\>\>[[:space:]]*::[[:space:]]*$ ]]; then
+            retained[${BASH_REMATCH[1]}]=1
+            continue
+        fi
+        if [[ $line =~ ^[[:space:]]*(\`\`\`+)[[:space:]]*(.*)$ ]]; then
+            emit_documentation $((line_number - 1))
+            in_block=true
+            fence_length=${#BASH_REMATCH[1]}
+            info=${BASH_REMATCH[2]}
+            block_start=$line_number
+            : > "$block_content"
+        fi
+    elif [[ $line =~ ^[[:space:]]*(\`\`\`+)[[:space:]]*$ ]]; then
+        if ((${#BASH_REMATCH[1]} == fence_length)); then
+            emit_code "$line_number" "$info"
+            in_block=false
+            documentation_start=$((line_number + 1))
+        else
+            printf '%s\n' "$line" >> "$block_content"
+        fi
+    else
+        printf '%s\n' "$line" >> "$block_content"
+    fi
+done < "$document"
+
+$in_block && die "unterminated code fence near line $line_number"
+emit_documentation "$line_number"
