@@ -21,4 +21,6 @@ directories and emits one `file=...` block per file:
 
 The resulting document can be rebuilt with `./tangler --output-dir rebuilt
 gathered.md`. Gatherer lengthens Markdown fences when source content contains
-backticks, so gathered blocks remain safe to tangle.
+backticks, so gathered blocks remain safe to tangle. Each block carries a
+`# tangler:block <sha256>` comment; those markers let a later gather recover
+multiple blocks from one tangled output file.

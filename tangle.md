@@ -229,6 +229,11 @@ The result is intentionally ordinary source files. They can be checked with
 the language's normal tools, committed as build artifacts, or consumed by a
 CI/CD pipeline.
 
+Gathered blocks carry a `# tangler:block <sha256>` comment in their source
+text. Tangling preserves that comment in the output file. When the file is
+gathered later, the comment is used as a boundary and identity marker, so
+several blocks targeting the same output file do not collapse into one block.
+
 ## Reproducing the executable
 
 From this directory, the document can reproduce the executable itself:

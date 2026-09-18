@@ -5,7 +5,8 @@ usage() {
     printf '%s\n' \
         'Usage: gather [--output FILE] [--root DIR] PATH...' \
         '' \
-        'Gather files into Markdown blocks accepted by tangler.'
+        'Gather files into Markdown blocks accepted by tangler.' \
+        'Existing # tangler:block HASH markers preserve block boundaries.'
 }
 
 die() {
@@ -53,6 +54,8 @@ done
 
 declare -a paths=()
 declare -A seen=()
+temporary=$(mktemp -d)
+trap 'rm -rf "$temporary"' EXIT
 
 add_path() {
     local path=$1
@@ -91,28 +94,72 @@ fence_for() {
 }
 
 write_block() {
-    local path=$1
-    local relative fence
-    relative=$(relative_path "$path")
-    fence=$(fence_for "$path")
+    local relative=$1
+    local block_id=$2
+    local block_file=$3
+    local fence
+    fence=$(fence_for "$block_file")
     printf '%s file=%s\n' "$fence" "$relative"
-    cat "$path"
-    if [[ -s $path ]]; then
-        last_byte=$(tail -c 1 "$path" | od -An -t x1)
+    printf '# tangler:block %s\n' "$block_id"
+    cat "$block_file"
+    if [[ -s $block_file ]]; then
+        last_byte=$(tail -c 1 "$block_file" | od -An -t x1)
         [[ $last_byte == *0a* ]] || printf '\n'
     fi
     printf '%s\n\n' "$fence"
 }
 
+write_file_blocks() {
+    local path=$1
+    local relative=$2
+    local line current_id marker_id current_file=$temporary/block has_marker=false
+    : > "$current_file"
+
+    emit_current() {
+        if [[ $has_marker != true && ! -s $current_file ]]; then
+            return 0
+        fi
+        if [[ $has_marker != true ]]; then
+            current_id=$(sha256sum "$current_file" | awk '{print $1}')
+        fi
+        write_block "$relative" "$current_id" "$current_file"
+        : > "$current_file"
+        has_marker=false
+    }
+
+    while IFS= read -r line || [[ -n $line ]]; do
+        if [[ $line == '# tangler:block '* ]]; then
+            marker_id=${line#\# tangler:block }
+            [[ $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]] || {
+                printf '%s\n' "$line" >> "$current_file"
+                continue
+            }
+            emit_current
+            current_id=$marker_id
+            has_marker=true
+        else
+            printf '%s\n' "$line" >> "$current_file"
+        fi
+    done < "$path"
+    emit_current
+    return 0
+}
+
+write_file() {
+    local path=$1
+    write_file_blocks "$path" "$(relative_path "$path")"
+    return 0
+}
+
 if [[ $output == - ]]; then
     for path in "${paths[@]}"; do
-        write_block "$path"
+        write_file "$path"
     done
 else
     mkdir -p "$(dirname "$output")"
     : > "$output"
     for path in "${paths[@]}"; do
-        write_block "$path" >> "$output"
+        write_file "$path" >> "$output"
     done
     printf 'gathered %s file(s) into %s\n' "${#paths[@]}" "$output" >&2
 fi
