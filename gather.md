@@ -128,7 +128,12 @@ write_block() {
     local block_file=$3
     local fence
     fence=$(fence_for "$block_file")
-    printf '%s file=%s\n' "$fence" "$relative"
+    if [[ $block_id == name=* ]]; then
+        block_name=${block_id#name=}
+        printf '%s <<%s>> file=%s\n' "$fence" "$block_name" "$relative"
+    else
+        printf '%s file=%s\n' "$fence" "$relative"
+    fi
     printf '# tangler:block %s\n' "$block_id"
     cat "$block_file"
     if [[ -s $block_file ]]; then
@@ -159,7 +164,7 @@ write_file_blocks() {
     while IFS= read -r line || [[ -n $line ]]; do
         if [[ $line == '# tangler:block '* ]]; then
             marker_id=${line#\# tangler:block }
-            [[ $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]] || {
+            [[ ($marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64) || $marker_id == name=* ]] || {
                 printf '%s\n' "$line" >> "$current_file"
                 continue
             }

@@ -1,6 +1,5 @@
 # Tangler
-## A markdown tangling program for literate CI/CD
-## By Joshua Chubb
+
 This file contains the literate program source.
 
 ## Purpose
@@ -269,6 +268,10 @@ blocks, named chunks, and anonymous code. Each code record carries a SHA-256
 content ID, so executable material can be located without confusing it with
 explanatory prose. Existing `# tangler:block` markers retain their IDs in the
 report.
+
+Named blocks use their names as identity instead of SHA-256. Gather writes
+named markers as `# tangler:block name=NAME`, avoiding a collision with noweb
+references while preserving the name through tangling.
 
 The weaver itself is documented in [weaver.md](weaver.md). Its retention
 lexicon uses declarations such as `:: <<named-block>> ::` near the top of the

@@ -10,6 +10,11 @@ A declaration means that a matching named block is retained by `--weave`.
 Undeclared named blocks and anonymous blocks remain visible in reports but are
 not copied into a weaved document. Prose is always retained by `--weave`.
 
+Names are identities, not hashes. A named block is reported with its name as
+its ID and does not receive a SHA-256 value. Only unnamed blocks are hashed.
+Gathered named output uses the safe marker `# tangler:block name=name`, which
+is restored as `<<name>> file=...` when gathered again.
+
 The output can be declared beside the lexicon with
 `:: weave-file="path/file.md" ::`. Relative paths are resolved next to the
 input document. An explicit `--output` option takes precedence.
@@ -112,6 +117,10 @@ emit_code() {
     local first_line marker_id
     local block_id retain=false
 
+    if [[ $info =~ \<\<([^\>]+)\>\> ]]; then
+        name=${BASH_REMATCH[1]}
+        [[ -n ${retained[$name]+set} ]] && retain=true
+    fi
     if [[ $info =~ file[[:space:]]*=[[:space:]]*([^[:space:]]+) ]]; then
         kind=file
         target=${BASH_REMATCH[1]}
@@ -119,17 +128,19 @@ emit_code() {
         target=${target%\"}
     elif [[ $info =~ \<\<([^\>]+)\>\> ]]; then
         kind=chunk
-        name=${BASH_REMATCH[1]}
-        [[ -n ${retained[$name]+set} ]] && retain=true
     fi
-    IFS= read -r first_line < "$block_content" || true
-    if [[ $first_line == '# tangler:block '* ]]; then
-        marker_id=${first_line#\# tangler:block }
-    fi
-    if [[ -n ${marker_id:-} && $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]]; then
-        block_id=$marker_id
+    if [[ $name != - ]]; then
+        block_id=$name
     else
-        block_id=$(sha256sum "$block_content" | awk '{print $1}')
+        IFS= read -r first_line < "$block_content" || true
+        if [[ $first_line == '# tangler:block '* ]]; then
+            marker_id=${first_line#\# tangler:block }
+        fi
+        if [[ -n ${marker_id:-} && $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]]; then
+            block_id=$marker_id
+        else
+            block_id=$(sha256sum "$block_content" | awk '{print $1}')
+        fi
     fi
     if $weave; then
         $retain && sed -n "${block_start},${end}p" "$document"

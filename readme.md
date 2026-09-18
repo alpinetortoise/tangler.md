@@ -1,4 +1,7 @@
-## Tangler
+# Tangler
+## A markdown tangling program for Literate CI/CD
+## By Joshua Chubb
+
 `tangler` turns Markdown code blocks into source files.
 
 Usage: `./tangler --output-dir build document.md`
@@ -43,3 +46,9 @@ the documentation and declared named blocks while omitting other source
 blocks from the weaved document.
 Add `:: weave-file="path/file.md" ::` near the top to select the woven output
 path relative to the input document. A command-line `--output` overrides it.
+Named blocks take precedence over hashes: they use their name as identity and
+are not assigned SHA-256 IDs. Unnamed blocks continue to receive hashes.
+
+Run `./tangler --output-dir build weaver.md` to reproduce the executable.
+Run `./weaver weaver.md` to inspect every region, or `./weaver --weave
+weaver.md` to retain prose and the declared `example` block.

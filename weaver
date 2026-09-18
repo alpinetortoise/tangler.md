@@ -89,6 +89,10 @@ emit_code() {
     local first_line marker_id
     local block_id retain=false
 
+    if [[ $info =~ \<\<([^\>]+)\>\> ]]; then
+        name=${BASH_REMATCH[1]}
+        [[ -n ${retained[$name]+set} ]] && retain=true
+    fi
     if [[ $info =~ file[[:space:]]*=[[:space:]]*([^[:space:]]+) ]]; then
         kind=file
         target=${BASH_REMATCH[1]}
@@ -96,17 +100,19 @@ emit_code() {
         target=${target%\"}
     elif [[ $info =~ \<\<([^\>]+)\>\> ]]; then
         kind=chunk
-        name=${BASH_REMATCH[1]}
-        [[ -n ${retained[$name]+set} ]] && retain=true
     fi
-    IFS= read -r first_line < "$block_content" || true
-    if [[ $first_line == '# tangler:block '* ]]; then
-        marker_id=${first_line#\# tangler:block }
-    fi
-    if [[ -n ${marker_id:-} && $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]]; then
-        block_id=$marker_id
+    if [[ $name != - ]]; then
+        block_id=$name
     else
-        block_id=$(sha256sum "$block_content" | awk '{print $1}')
+        IFS= read -r first_line < "$block_content" || true
+        if [[ $first_line == '# tangler:block '* ]]; then
+            marker_id=${first_line#\# tangler:block }
+        fi
+        if [[ -n ${marker_id:-} && $marker_id != *[![:xdigit:]]* && ${#marker_id} -eq 64 ]]; then
+            block_id=$marker_id
+        else
+            block_id=$(sha256sum "$block_content" | awk '{print $1}')
+        fi
     fi
     if $weave; then
         $retain && sed -n "${block_start},${end}p" "$document"
