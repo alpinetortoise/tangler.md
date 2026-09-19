@@ -1,3 +1,16 @@
+## PowerShell
+
+PowerShell equivalents are provided as `tangler.ps1`, `gather.ps1`, and
+`weaver.ps1`. Their command contracts mirror the Bash tools:
+
+```powershell
+pwsh -File .\tangler.ps1 -Document stress.md -OutputDir build
+pwsh -File .\weaver.ps1 -Document stress.md
+pwsh -File .\weaver.ps1 -Document stress.md -Weave
+pwsh -File .\gather.ps1 -Root build build\app.sh build\worker.sh build\report.txt
+```
+
+PowerShell 7 or later is recommended for cross-platform behavior.
 # Tangler
 ## A markdown tangling program for Literate CI/CD
 ## By Joshua Chubb
